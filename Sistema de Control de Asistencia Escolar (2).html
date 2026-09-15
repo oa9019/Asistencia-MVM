@@ -1,0 +1,1706 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>U.E. María Virgen Misionera - Control de Asistencia</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Configuración para Aplicación Móvil (PWA) -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Asistencia UEMVM">
+    <meta name="theme-color" content="#8b5cf6">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2641/2641409.png">
+    <link rel="manifest" href='data:application/manifest+json,{"name":"Control de Asistencia - U.E. María Virgen Misionera","short_name":"Asistencia","start_url":".","display":"standalone","background_color":"#f8fafc","theme_color":"#8b5cf6","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/2641/2641409.png","sizes":"192x192","type":"image/png"}]}'>
+
+    <!-- SheetJS para Exportación a Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- jsPDF & AutoTable para Exportación a PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                    },
+                    colors: {
+                        pastel: {
+                            rose: '#ffe4e6',
+                            roseDark: '#f43f5e',
+                            mint: '#d1fae5',
+                            mintDark: '#10b981',
+                            sky: '#e0f2fe',
+                            skyDark: '#0284c7',
+                            lavender: '#ede9fe',
+                            lavenderDark: '#8b5cf6',
+                            peach: '#ffedd5',
+                            peachDark: '#f97316',
+                            cream: '#fefce8',
+                            slate: '#f8fafc',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            background-color: #f8fafc;
+            color: #334155;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar {
+            height: 6px;
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printSection, #printSection * {
+                visibility: visible;
+            }
+            #printSection {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 10px;
+                background-color: white !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col bg-slate-50">
+
+    <!-- Pantalla de Inicio de Sesión y Registro -->
+    <div id="authScreen" class="fixed inset-0 z-50 bg-gradient-to-br from-violet-600 via-purple-600 to-pink-500 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 border border-white/40 space-y-5 my-auto">
+            <div class="text-center space-y-2">
+                <div class="w-16 h-16 bg-purple-100 text-purple-600 rounded-2xl flex items-center justify-center mx-auto text-2xl shadow-inner">
+                    <i class="fa-solid fa-school-flag"></i>
+                </div>
+                <h2 class="text-xl font-bold text-slate-800 tracking-tight">U.E. María Virgen Misionera</h2>
+                <p class="text-xs text-purple-700 font-semibold bg-purple-50 inline-block px-3 py-1 rounded-full border border-purple-200">Control de Asistencia Escolar</p>
+            </div>
+
+            <!-- Selector Pestañas Login / Registro -->
+            <div class="flex bg-slate-100 p-1 rounded-2xl text-xs font-bold text-slate-500">
+                <button id="authTabLoginBtn" onclick="switchAuthTab('login')" class="flex-1 py-2 rounded-xl bg-white text-purple-700 shadow-xs transition">Iniciar Sesión</button>
+                <button id="authTabRegisterBtn" onclick="switchAuthTab('register')" class="flex-1 py-2 rounded-xl hover:text-slate-700 transition">Crear Usuario</button>
+            </div>
+
+            <!-- Formulario Iniciar Sesión -->
+            <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-3.5">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Usuario</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-user absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="loginUsername" required placeholder="Ingresa tu usuario" class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-purple-400">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Contraseña</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-purple-400">
+                    </div>
+                </div>
+                <button type="submit" class="w-full py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold text-xs rounded-xl shadow-md transition duration-150 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i>
+                    <span>Ingresar al Sistema</span>
+                </button>
+            </form>
+
+            <!-- Formulario Registro de Usuario -->
+            <form id="registerForm" onsubmit="handleRegister(event)" class="space-y-3 hidden">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre y Apellido del Docente</label>
+                    <input type="text" id="regTeacherName" required placeholder="Ej: Prof. Carmen Rodríguez" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-purple-400">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Materia / Asignatura que Imparte</label>
+                    <input type="text" id="regSubject" required placeholder="Ej: Matemática, Biología, Historia..." class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-purple-400">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Usuario</label>
+                        <input type="text" id="regUsername" required placeholder="Ej: crodriguez" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-purple-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Contraseña</label>
+                        <input type="password" id="regPassword" required placeholder="••••••••" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-purple-400">
+                    </div>
+                </div>
+                <button type="submit" class="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md transition duration-150 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-user-plus"></i>
+                    <span>Crear Cuenta y Entrar</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Encabezado Principal de la App -->
+    <header class="bg-gradient-to-r from-violet-600 via-purple-500 to-pink-500 text-white shadow-md border-b border-purple-200 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 bg-white/20 backdrop-blur-md rounded-2xl shadow-inner">
+                            <i class="fa-solid fa-school text-2xl text-white"></i>
+                        </div>
+                        <div>
+                            <h1 class="text-lg sm:text-xl font-bold tracking-tight leading-tight">U.E. María Virgen Misionera</h1>
+                            <div class="flex flex-wrap items-center gap-2 mt-0.5">
+                                <span class="text-[11px] text-purple-100 font-semibold" id="headerTeacherName">Docente: --</span>
+                                <span class="text-[10px] bg-white/20 text-white font-bold px-2 py-0.5 rounded-md cursor-pointer hover:bg-white/30 transition" onclick="openEditSubjectModal()" id="headerSubjectBadge">
+                                    <i class="fa-solid fa-book-bookmark text-[9px] mr-1"></i><span id="headerSubject">Materia: --</span>
+                                </span>
+                                <!-- Badge de Estado de la Nube -->
+                                <div id="cloudStatusBadge" class="flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white/10 text-purple-100 border border-white/20">
+                                    <i class="fa-solid fa-cloud-arrow-up text-[10px]"></i>
+                                    <span>Conectando...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-1.5 md:hidden">
+                        <button onclick="openInstallModal()" class="bg-amber-300 text-purple-950 font-bold px-2 py-1.5 rounded-xl text-xs flex items-center gap-1 shadow-xs">
+                            <i class="fa-solid fa-mobile-screen-button"></i>
+                            <span>App</span>
+                        </button>
+                        <button onclick="logoutUser()" title="Cerrar Sesión" class="bg-white/20 hover:bg-white/30 text-white p-1.5 rounded-xl text-xs">
+                            <i class="fa-solid fa-right-from-bracket text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2 pt-1 md:pt-0">
+                    <button onclick="openInstallModal()" class="hidden md:flex items-center space-x-1.5 bg-amber-300 hover:bg-amber-400 text-purple-950 font-bold px-3 py-1.5 rounded-xl shadow-xs text-xs transition duration-150">
+                        <i class="fa-solid fa-mobile-screen-button text-sm"></i>
+                        <span>Instalar en Celular</span>
+                    </button>
+
+                    <div class="flex items-center bg-white/20 backdrop-blur-md rounded-xl px-2.5 py-1 border border-white/30 text-white">
+                        <i class="fa-regular fa-calendar text-white/90 mr-1.5 text-xs"></i>
+                        <input type="date" id="attendanceDate" class="bg-transparent text-white text-xs font-semibold focus:outline-none cursor-pointer border-none" onchange="loadAttendanceForDate()">
+                    </div>
+
+                    <button onclick="openImportModal()" class="flex items-center space-x-1.5 bg-white text-purple-700 hover:bg-purple-50 font-semibold px-3 py-1.5 rounded-xl shadow-xs text-xs transition duration-150">
+                        <i class="fa-solid fa-user-plus text-xs"></i>
+                        <span>Estudiantes</span>
+                    </button>
+
+                    <button onclick="generateMonthlyReport()" class="flex items-center space-x-1.5 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold px-3 py-1.5 rounded-xl shadow-xs text-xs transition duration-150">
+                        <i class="fa-solid fa-file-invoice text-xs"></i>
+                        <span>Reporte Mensual</span>
+                    </button>
+
+                    <button onclick="logoutUser()" title="Cerrar Sesión" class="hidden md:flex items-center space-x-1 bg-white/20 hover:bg-rose-500 text-white font-semibold px-2.5 py-1.5 rounded-xl text-xs transition">
+                        <i class="fa-solid fa-right-from-bracket"></i>
+                        <span>Salir</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-4 space-y-4">
+
+        <!-- Selector de Grados (1er Año a 5to Año) -->
+        <div class="bg-white rounded-2xl p-2.5 shadow-xs border border-slate-200">
+            <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5 px-2">Seleccionar Año Lectivo</div>
+            <div class="grid grid-cols-5 gap-1.5" id="gradeTabs">
+                <!-- Se genera dinámicamente -->
+            </div>
+        </div>
+
+        <!-- Selector de Secciones y Estadísticas Resumen -->
+        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div class="flex items-center space-x-1.5 bg-white p-1.5 rounded-2xl shadow-xs border border-slate-200" id="sectionTabs">
+                <!-- Se genera dinámicamente -->
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div class="bg-pastel-mint/70 border border-emerald-200 rounded-2xl px-3 py-1.5 flex items-center justify-between shadow-2xs">
+                    <div>
+                        <div class="text-[11px] font-medium text-emerald-800">Presentes</div>
+                        <div class="text-lg font-bold text-emerald-950" id="statPresent">0</div>
+                    </div>
+                    <i class="fa-solid fa-circle-check text-emerald-500 text-lg"></i>
+                </div>
+
+                <div class="bg-pastel-rose/70 border border-rose-200 rounded-2xl px-3 py-1.5 flex items-center justify-between shadow-2xs">
+                    <div>
+                        <div class="text-[11px] font-medium text-rose-800">Ausentes</div>
+                        <div class="text-lg font-bold text-rose-950" id="statAbsent">0</div>
+                    </div>
+                    <i class="fa-solid fa-circle-xmark text-rose-500 text-lg"></i>
+                </div>
+
+                <div class="bg-pastel-peach/70 border border-amber-200 rounded-2xl px-3 py-1.5 flex items-center justify-between shadow-2xs">
+                    <div>
+                        <div class="text-[11px] font-medium text-amber-800">Justificados</div>
+                        <div class="text-lg font-bold text-amber-950" id="statJustified">0</div>
+                    </div>
+                    <i class="fa-solid fa-clock-rotate-left text-amber-500 text-lg"></i>
+                </div>
+
+                <div class="bg-pastel-sky/70 border border-sky-200 rounded-2xl px-3 py-1.5 flex items-center justify-between shadow-2xs">
+                    <div>
+                        <div class="text-[11px] font-medium text-sky-800">Total Sección</div>
+                        <div class="text-lg font-bold text-sky-950" id="statTotal">0</div>
+                    </div>
+                    <i class="fa-solid fa-users text-sky-500 text-lg"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barra de Búsqueda y Acciones Rápidas -->
+        <div class="bg-white rounded-2xl p-3 shadow-xs border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-3">
+            <div class="relative w-full md:w-72">
+                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input type="text" id="searchInput" oninput="renderStudentList()" placeholder="Buscar estudiante por nombre..." class="w-full pl-9 pr-3 py-1.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-purple-400 text-xs">
+            </div>
+
+            <div class="flex flex-wrap items-center gap-1.5 w-full md:w-auto justify-end">
+                <button onclick="setAllStatus('present')" class="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-semibold rounded-xl transition duration-150 flex items-center gap-1">
+                    <i class="fa-solid fa-check-double text-[11px]"></i> Todos Presentes
+                </button>
+                <button onclick="setAllStatus('absent')" class="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-semibold rounded-xl transition duration-150 flex items-center gap-1">
+                    <i class="fa-solid fa-xmark text-[11px]"></i> Todos Ausentes
+                </button>
+                <button onclick="setAllStatus('none')" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition duration-150">
+                    Reiniciar
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-gradient-to-r from-emerald-50 via-purple-50 to-rose-50 border border-purple-200/80 rounded-2xl p-2.5 px-3.5 flex items-center justify-between text-xs text-slate-700 shadow-2xs">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-hand-pointer text-purple-600 text-sm animate-pulse"></i>
+                <span class="font-medium text-[11px] sm:text-xs">
+                    <strong class="text-emerald-700">👉 Desliza Derecha:</strong> Presente &nbsp;|&nbsp; 
+                    <strong class="text-rose-700">👈 Desliza Izquierda:</strong> Ausente
+                </span>
+            </div>
+            <span class="hidden sm:inline-block text-[10px] bg-white/90 text-purple-700 font-bold px-2 py-0.5 rounded-lg border border-purple-200">Gesto Táctil / Ratón</span>
+        </div>
+
+        <!-- Grid de Estudiantes -->
+        <div id="studentContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <!-- Tarjetas de estudiantes generadas dinámicamente -->
+        </div>
+
+        <!-- Estado Vacío -->
+        <div id="emptyState" class="hidden text-center py-12 bg-white rounded-2xl border border-slate-200 shadow-2xs">
+            <div class="w-14 h-14 bg-purple-50 text-purple-400 rounded-full flex items-center justify-center mx-auto mb-2 text-xl">
+                <i class="fa-solid fa-user-slash"></i>
+            </div>
+            <h3 class="text-sm font-semibold text-slate-700">No hay estudiantes en esta sección</h3>
+            <p class="text-xs text-slate-400 max-w-xs mx-auto mt-1 mb-3">Puedes agregar estudiantes de forma manual o subir un archivo Excel.</p>
+            <button onclick="openImportModal()" class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium text-xs rounded-xl shadow-xs transition">
+                <i class="fa-solid fa-plus mr-1"></i> Agregar Estudiantes
+            </button>
+        </div>
+    </main>
+
+    <!-- Modal Agregar / Importar Estudiantes -->
+    <div id="importModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-5 space-y-4 border border-purple-100">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div class="flex items-center space-x-2">
+                    <div class="p-2 bg-purple-100 text-purple-600 rounded-xl">
+                        <i class="fa-solid fa-users-gear text-base"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-sm">Gestionar Estudiantes</h3>
+                        <p class="text-[11px] text-slate-400" id="modalSectionBadge">1º Año - Sección A</p>
+                    </div>
+                </div>
+                <button onclick="closeImportModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-full">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <div class="flex border-b border-slate-200 text-xs font-semibold">
+                <button id="tabManualBtn" onclick="switchModalTab('manual')" class="px-3 py-1.5 border-b-2 border-purple-600 text-purple-600">Agregar Individual</button>
+                <button id="tabBatchBtn" onclick="switchModalTab('batch')" class="px-3 py-1.5 border-b-2 border-transparent text-slate-400 hover:text-slate-600">Cargar Lista / Excel</button>
+            </div>
+
+            <form id="formManual" onsubmit="saveSingleStudent(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Nombre Completo del Estudiante</label>
+                    <input type="text" id="manualStudentName" required placeholder="Ej: María Alejandra Pérez" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-purple-400">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Nº de Lista / Cédula (Opcional)</label>
+                    <input type="text" id="manualStudentCode" placeholder="Ej: 01 o V-30.123.456" class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-purple-400">
+                </div>
+                <div class="flex justify-end gap-2 pt-2">
+                    <button type="button" onclick="closeImportModal()" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                    <button type="submit" class="px-4 py-1.5 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-xs">Guardar Estudiante</button>
+                </div>
+            </form>
+
+            <div id="formBatch" class="space-y-3 hidden">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Escribe o Pega la Lista (Un nombre por línea)</label>
+                    <textarea id="batchText" rows="4" placeholder="Pérez María&#10;Gómez Juan&#10;Rodríguez Sofía..." class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-purple-400 custom-scrollbar"></textarea>
+                </div>
+
+                <div class="relative flex items-center justify-center border-2 border-dashed border-purple-200 rounded-2xl p-3 bg-purple-50/50 hover:bg-purple-50 transition cursor-pointer" onclick="document.getElementById('excelFileInput').click()">
+                    <input type="file" id="excelFileInput" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
+                    <div class="text-center">
+                        <i class="fa-solid fa-file-excel text-emerald-500 text-xl mb-1"></i>
+                        <p class="text-xs font-medium text-slate-700">Subir archivo Excel (.xlsx, .csv)</p>
+                        <p class="text-[10px] text-slate-400">Toma los nombres de la primera columna</p>
+                    </div>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-1">
+                    <button type="button" onclick="closeImportModal()" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                    <button type="button" onclick="saveBatchStudents()" class="px-4 py-1.5 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-xs">Guardar Lista</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Cambiar Materia -->
+    <div id="editSubjectModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-2xs flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-xs w-full p-5 space-y-3 border border-purple-100">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                <h3 class="font-bold text-slate-800 text-sm flex items-center gap-1.5">
+                    <i class="fa-solid fa-book-open text-purple-600"></i>
+                    <span>Configurar Materia</span>
+                </h3>
+                <button onclick="closeEditSubjectModal()" class="text-slate-400 hover:text-slate-600 p-1 rounded-full">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1">Materia o Asignatura Actual</label>
+                <input type="text" id="editSubjectInput" placeholder="Ej: Matemática, Física..." class="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-purple-400">
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+                <button onclick="closeEditSubjectModal()" class="px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                <button onclick="saveUpdatedSubject()" class="px-4 py-1.5 text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white rounded-xl shadow-xs">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Reporte Mensual -->
+    <div id="reportModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center z-50 hidden p-2 sm:p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-6xl w-full h-[90vh] flex flex-col border border-purple-100 overflow-hidden">
+            <div class="p-3.5 sm:p-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/50">
+                <div>
+                    <h3 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-file-invoice text-purple-600"></i>
+                        <span>U.E. María Virgen Misionera - Reporte Mensual</span>
+                    </h3>
+                    <p class="text-xs text-slate-500 font-medium" id="reportSubtitle">1º Año - Sección A</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <input type="month" id="reportMonthPicker" class="px-2.5 py-1.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white" onchange="renderReportTable()">
+
+                    <button onclick="exportToExcel()" class="px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-file-excel text-emerald-600"></i> Excel
+                    </button>
+
+                    <button onclick="exportToPDF()" class="px-3 py-1.5 bg-rose-100 hover:bg-rose-200 text-rose-800 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition">
+                        <i class="fa-solid fa-file-pdf text-rose-600"></i> PDF
+                    </button>
+
+                    <button onclick="printReport()" class="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-xs transition">
+                        <i class="fa-solid fa-print"></i> Imprimir
+                    </button>
+
+                    <button onclick="closeReportModal()" class="p-1 text-slate-400 hover:text-slate-600 rounded-full ml-1">
+                        <i class="fa-solid fa-xmark text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex-1 overflow-auto p-3 custom-scrollbar" id="printSection">
+                <div class="mb-3 hidden print:block text-center border-b pb-2">
+                    <h2 class="text-lg font-bold text-purple-900">U.E. María Virgen Misionera</h2>
+                    <p class="text-xs font-bold text-slate-700" id="printHeaderSubject"></p>
+                    <p class="text-xs font-semibold text-slate-600" id="printHeaderSubtitle"></p>
+                </div>
+                <div class="overflow-x-auto rounded-2xl border border-purple-100">
+                    <table class="w-full text-xs text-left" id="reportTable">
+                        <!-- Se llena dinámicamente -->
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Confirmar Eliminación -->
+    <div id="deleteConfirmModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-5 space-y-4 border border-rose-100">
+            <div class="flex items-center space-x-3 text-rose-600">
+                <div class="p-2.5 bg-rose-100 rounded-2xl">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-slate-800 text-sm">Eliminar Estudiante</h3>
+                    <p class="text-[11px] text-slate-400">Esta acción elimina el registro</p>
+                </div>
+            </div>
+            <p id="deleteConfirmText" class="text-xs text-slate-600 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+                ¿Estás seguro de que deseas eliminar a este estudiante?
+            </p>
+            <div class="flex justify-end gap-2 pt-1">
+                <button onclick="closeDeleteModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition">
+                    Cancelar
+                </button>
+                <button onclick="confirmDeleteStudent()" class="px-4 py-2 text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-xs transition">
+                    Sí, Eliminar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Instrucciones Celular -->
+    <div id="installModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-2xs flex items-center justify-center z-50 hidden p-4">
+        <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-5 space-y-4 border border-purple-100">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                <div class="flex items-center space-x-2">
+                    <div class="p-2 bg-purple-100 text-purple-600 rounded-xl">
+                        <i class="fa-solid fa-mobile-screen-button text-lg"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-800 text-sm">Instalar en Celular</h3>
+                        <p class="text-[11px] text-slate-400">Sincronizado en tiempo real</p>
+                    </div>
+                </div>
+                <button onclick="closeInstallModal()" class="text-slate-400 hover:text-slate-600 p-1.5 rounded-full">
+                    <i class="fa-solid fa-xmark text-base"></i>
+                </button>
+            </div>
+
+            <div class="space-y-3 text-xs text-slate-600">
+                <div class="p-2.5 bg-slate-50 rounded-2xl border border-slate-200">
+                    <div class="font-bold text-slate-800 text-xs mb-1 flex items-center gap-1.5">
+                        <i class="fa-brands fa-android text-emerald-600 text-sm"></i> Android (Chrome):
+                    </div>
+                    <ol class="list-decimal list-inside space-y-1 text-slate-600 text-[11px]">
+                        <li>Toca los <strong>3 puntos (⋮)</strong> en la esquina superior.</li>
+                        <li>Selecciona <strong>"Añadir a la pantalla de inicio"</strong>.</li>
+                        <li>¡Listo! Ya tienes la app en tu celular.</li>
+                    </ol>
+                </div>
+
+                <div class="p-2.5 bg-slate-50 rounded-2xl border border-slate-200">
+                    <div class="font-bold text-slate-800 text-xs mb-1 flex items-center gap-1.5">
+                        <i class="fa-brands fa-apple text-slate-800 text-sm"></i> iPhone (Safari):
+                    </div>
+                    <ol class="list-decimal list-inside space-y-1 text-slate-600 text-[11px]">
+                        <li>Toca el botón <strong>Compartir <i class="fa-solid fa-share-from-square"></i></strong> abajo.</li>
+                        <li>Elige <strong>"Agregar a inicio" <i class="fa-regular fa-square-plus"></i></strong>.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="pt-1">
+                <button onclick="closeInstallModal()" class="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-xs transition">
+                    ¡Entendido!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-800 text-white px-4 py-2.5 rounded-2xl shadow-xl transition-all duration-300 transform translate-y-20 opacity-0 z-50 flex items-center space-x-2 text-xs font-semibold">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+        <span id="toastMessage">Acción realizada con éxito</span>
+    </div>
+
+    <!-- Módulo Firebase JS SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, deleteDoc, collection, query, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.firebaseModule = {
+            initializeApp,
+            getAuth,
+            signInAnonymously,
+            signInWithCustomToken,
+            onAuthStateChanged,
+            getFirestore,
+            doc,
+            setDoc,
+            getDoc,
+            deleteDoc,
+            collection,
+            query,
+            onSnapshot
+        };
+
+        if (window.onFirebaseModuleReady) {
+            window.onFirebaseModuleReady();
+        }
+    </script>
+
+    <script>
+        const GRADES = ['1º Año', '2º Año', '3º Año', '4º Año', '5º Año'];
+        const SECTIONS = ['A', 'B', 'C'];
+        
+        let currentGrade = '1º Año';
+        let currentSection = 'A';
+        let currentDate = new Date().toISOString().split('T')[0];
+        let studentToDeleteId = null;
+        let isInitialized = false;
+
+        let db = {
+            users: [],
+            currentUser: null,
+            students: [],
+            attendance: {}
+        };
+
+        // Cloud Firebase Global State Variables
+        window.firebaseApp = null;
+        window.firebaseAuth = null;
+        window.firestoreDb = null;
+        window.currentUserAuth = null;
+        window.isFirestoreReady = false;
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'ue-maria-virgen-misionera';
+
+        function seedMockData() {
+            db = {
+                users: [
+                    { username: 'docente', password: '123', name: 'Prof. Guía', subject: 'Matemática' }
+                ],
+                currentUser: null,
+                students: [
+                    { id: 'std_1', name: 'Alvarez Gabriel', code: '01', grade: '1º Año', section: 'A' },
+                    { id: 'std_2', name: 'Blanco Sofía', code: '02', grade: '1º Año', section: 'A' },
+                    { id: 'std_3', name: 'Castillo Carlos', code: '03', grade: '1º Año', section: 'A' },
+                    { id: 'std_4', name: 'Díaz Valentina', code: '04', grade: '1º Año', section: 'B' },
+                    { id: 'std_5', name: 'Fernández Luis', code: '05', grade: '2º Año', section: 'A' }
+                ],
+                attendance: {}
+            };
+            saveDB();
+        }
+
+        function loadDB() {
+            try {
+                const saved = localStorage.getItem('school_attendance_db_v4');
+                if (saved) {
+                    db = JSON.parse(saved);
+                    if (!db.users) db.users = [];
+                } else {
+                    seedMockData();
+                }
+            } catch(e) {
+                console.warn("Ejecutando en modo seguro de memoria:", e);
+                seedMockData();
+            }
+        }
+
+        function saveDB() {
+            try {
+                localStorage.setItem('school_attendance_db_v4', JSON.stringify(db));
+            } catch(e) {
+                console.warn("No se pudo guardar localmente:", e);
+            }
+        }
+
+        window.onFirebaseModuleReady = function() {
+            initFirebaseCloud();
+        };
+
+        async function initFirebaseCloud() {
+            if (!window.firebaseModule) return;
+            const { 
+                initializeApp, getAuth, signInAnonymously, signInWithCustomToken, 
+                onAuthStateChanged, getFirestore 
+            } = window.firebaseModule;
+
+            // Utiliza la configuración de Firebase inyectada o config por defecto
+            let firebaseConfig = null;
+            try {
+                if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+                    firebaseConfig = JSON.parse(__firebase_config);
+                }
+            } catch(e) {
+                console.warn("No se pudo parsear __firebase_config:", e);
+            }
+
+            if (!firebaseConfig) {
+                updateCloudStatusBadge(false);
+                return;
+            }
+
+            try {
+                window.firebaseApp = initializeApp(firebaseConfig);
+                window.firebaseAuth = getAuth(window.firebaseApp);
+                window.firestoreDb = getFirestore(window.firebaseApp);
+
+                // Regla 3: Autenticarse primero antes de cualquier consulta
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(window.firebaseAuth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(window.firebaseAuth);
+                }
+
+                onAuthStateChanged(window.firebaseAuth, (user) => {
+                    if (user) {
+                        window.currentUserAuth = user;
+                        window.isFirestoreReady = true;
+                        updateCloudStatusBadge(true);
+                        setupRealtimeListeners();
+                    } else {
+                        window.currentUserAuth = null;
+                        window.isFirestoreReady = false;
+                        updateCloudStatusBadge(false);
+                    }
+                });
+
+            } catch(err) {
+                console.warn("Aviso de sincronización en la nube:", err);
+                updateCloudStatusBadge(false);
+            }
+        }
+
+        function updateCloudStatusBadge(isConnected) {
+            const badge = document.getElementById('cloudStatusBadge');
+            if (!badge) return;
+            if (isConnected) {
+                badge.className = "flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-400/20 text-emerald-100 border border-emerald-300/30";
+                badge.innerHTML = `<i class="fa-solid fa-cloud text-[10px] animate-pulse"></i><span>Sincronizado</span>`;
+            } else {
+                badge.className = "flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-semibold bg-white/10 text-purple-100 border border-white/20";
+                badge.innerHTML = `<i class="fa-solid fa-hard-drive text-[10px]"></i><span>Modo Local</span>`;
+            }
+        }
+
+        function setupRealtimeListeners() {
+            if (!window.isFirestoreReady || !window.firestoreDb || !window.firebaseModule) return;
+            const { collection, doc, setDoc, onSnapshot } = window.firebaseModule;
+
+            // Regla 1: Usar rutas estrictas de Firestore (/artifacts/{appId}/public/data/{collection})
+            // 1. Listener de Estudiantes en tiempo real
+            const studentsPath = collection(window.firestoreDb, 'artifacts', appId, 'public', 'data', 'students');
+            onSnapshot(studentsPath, (snapshot) => {
+                if (!snapshot.empty) {
+                    const cloudStudents = [];
+                    snapshot.forEach(docSnap => cloudStudents.push(docSnap.data()));
+                    if (cloudStudents.length > 0) {
+                        db.students = cloudStudents;
+                        saveDB();
+                        renderSectionTabs();
+                        renderStudentList();
+                    }
+                } else if (db.students.length > 0) {
+                    // Sembrar estudiantes locales en la nube si la nube está vacía
+                    db.students.forEach(st => {
+                        const ref = doc(window.firestoreDb, 'artifacts', appId, 'public', 'data', 'students', st.id);
+                        setDoc(ref, st).catch(e => console.warn(e));
+                    });
+                }
+            }, (error) => {
+                console.warn("Error en listener de estudiantes:", error);
+            });
+
+            // 2. Listener de Asistencia en tiempo real
+            const attendancePath = collection(window.firestoreDb, 'artifacts', appId, 'public', 'data', 'attendance');
+            onSnapshot(attendancePath, (snapshot) => {
+                if (!snapshot.empty) {
+                    snapshot.forEach(docSnap => {
+                        const data = docSnap.data();
+                        if (data && data.records) {
+                            db.attendance[docSnap.id] = data.records;
+                        }
+                    });
+                    saveDB();
+                    renderStudentList();
+                }
+            }, (error) => {
+                console.warn("Error en listener de asistencia:", error);
+            });
+
+            // 3. Listener de Usuarios/Docentes
+            const usersPath = collection(window.firestoreDb, 'artifacts', appId, 'public', 'data', 'users');
+            onSnapshot(usersPath, (snapshot) => {
+                if (!snapshot.empty) {
+                    const cloudUsers = [];
+                    snapshot.forEach(docSnap => cloudUsers.push(docSnap.data()));
+                    if (cloudUsers.length > 0) {
+                        db.users = cloudUsers;
+                        saveDB();
+                    }
+                }
+            }, (error) => {
+                console.warn("Error en listener de usuarios:", error);
+            });
+        }
+
+        async function syncStudentToCloud(studentObj) {
+            if (window.isFirestoreReady && window.firestoreDb && window.firebaseModule) {
+                try {
+                    const { doc, setDoc } = window.firebaseModule;
+                    const ref = doc(window.firestoreDb, 'artifacts', appId, 'public', 'data', 'students', studentObj.id);
+                    await setDoc(ref, studentObj);
+                } catch(e) {
+                    console.warn("No se pudo sincronizar estudiante:", e);
+                }
+            }
+        }
+
+        async function syncAttendanceToCloud(dateKey) {
+            if (window.isFirestoreReady && window.firestoreDb && window.firebaseModule) {
+                try {
+                    const { doc, setDoc } = window.firebaseModule;
+                    const ref = doc(window.firestoreDb, 'artifacts', appId, 'public', 'data', 'attendance', dateKey);
+                    await setDoc(ref, {
+                        date: dateKey,
+                        records: db.attendance[dateKey] || {}
+                    });
+                } catch(e) {
+                    console.warn("No se pudo sincronizar asistencia:", e);
+                }
+            }
+        }
+
+        async function syncUserToCloud(userObj) {
+            if (window.isFirestoreReady && window.firestoreDb && window.firebaseModule) {
+                try {
+                    const { doc, setDoc } = window.firebaseModule;
+                    const ref = doc(window.firestoreDb, 'artifacts', appId, 'public', 'data', 'users', userObj.username.toLowerCase());
+                    await setDoc(ref, userObj);
+                } catch(e) {
+                    console.warn("No se pudo sincronizar usuario:", e);
+                }
+            }
+        }
+
+        function initApp() {
+            if (isInitialized) return;
+            isInitialized = true;
+            loadDB();
+
+            checkAuthStatus();
+
+            const dateInput = document.getElementById('attendanceDate');
+            if (dateInput) dateInput.value = currentDate;
+            
+            const monthInput = document.getElementById('reportMonthPicker');
+            if (monthInput) monthInput.value = currentDate.substring(0, 7);
+
+            renderGradeTabs();
+            renderSectionTabs();
+            renderStudentList();
+            updateHeaderUserInfo();
+
+            if (window.firebaseModule) {
+                initFirebaseCloud();
+            }
+        }
+
+        function checkAuthStatus() {
+            const authScreen = document.getElementById('authScreen');
+            if (db.currentUser) {
+                authScreen.classList.add('hidden');
+            } else {
+                authScreen.classList.remove('hidden');
+            }
+        }
+
+        function switchAuthTab(tab) {
+            const loginBtn = document.getElementById('authTabLoginBtn');
+            const regBtn = document.getElementById('authTabRegisterBtn');
+            const loginForm = document.getElementById('loginForm');
+            const regForm = document.getElementById('registerForm');
+
+            if (tab === 'login') {
+                loginBtn.className = "flex-1 py-2 rounded-xl bg-white text-purple-700 shadow-xs transition";
+                regBtn.className = "flex-1 py-2 rounded-xl hover:text-slate-700 transition";
+                loginForm.classList.remove('hidden');
+                regForm.classList.add('hidden');
+            } else {
+                regBtn.className = "flex-1 py-2 rounded-xl bg-white text-purple-700 shadow-xs transition";
+                loginBtn.className = "flex-1 py-2 rounded-xl hover:text-slate-700 transition";
+                regForm.classList.remove('hidden');
+                loginForm.classList.add('hidden');
+            }
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('loginUsername').value.trim();
+            const p = document.getElementById('loginPassword').value.trim();
+
+            const user = db.users.find(usr => usr.username.toLowerCase() === u.toLowerCase() && usr.password === p);
+
+            if (user) {
+                db.currentUser = user;
+                saveDB();
+                checkAuthStatus();
+                updateHeaderUserInfo();
+                showToast(`¡Bienvenido/a ${user.name}!`);
+            } else {
+                showToast("Usuario o contraseña incorrectos", "error");
+            }
+        }
+
+        function handleRegister(e) {
+            e.preventDefault();
+            const name = document.getElementById('regTeacherName').value.trim();
+            const subject = document.getElementById('regSubject').value.trim();
+            const username = document.getElementById('regUsername').value.trim();
+            const password = document.getElementById('regPassword').value.trim();
+
+            if (!name || !subject || !username || !password) return;
+
+            const existing = db.users.find(usr => usr.username.toLowerCase() === username.toLowerCase());
+            if (existing) {
+                showToast("Ese nombre de usuario ya está registrado", "error");
+                return;
+            }
+
+            const newUser = { name, subject, username, password };
+            db.users.push(newUser);
+            db.currentUser = newUser;
+            saveDB();
+            syncUserToCloud(newUser);
+
+            checkAuthStatus();
+            updateHeaderUserInfo();
+            showToast("¡Cuenta creada e iniciada exitosamente!");
+        }
+
+        function logoutUser() {
+            db.currentUser = null;
+            saveDB();
+            checkAuthStatus();
+            showToast("Sesión cerrada correctamente");
+        }
+
+        function updateHeaderUserInfo() {
+            if (db.currentUser) {
+                document.getElementById('headerTeacherName').innerText = `Docente: ${db.currentUser.name}`;
+                document.getElementById('headerSubject').innerText = `Materia: ${db.currentUser.subject || 'Sin especificar'}`;
+            }
+        }
+
+        function openEditSubjectModal() {
+            if (!db.currentUser) return;
+            document.getElementById('editSubjectInput').value = db.currentUser.subject || '';
+            document.getElementById('editSubjectModal').classList.remove('hidden');
+        }
+
+        function closeEditSubjectModal() {
+            document.getElementById('editSubjectModal').classList.add('hidden');
+        }
+
+        function saveUpdatedSubject() {
+            const newSub = document.getElementById('editSubjectInput').value.trim();
+            if (newSub && db.currentUser) {
+                db.currentUser.subject = newSub;
+                const idx = db.users.findIndex(u => u.username === db.currentUser.username);
+                if (idx !== -1) {
+                    db.users[idx].subject = newSub;
+                    syncUserToCloud(db.users[idx]);
+                }
+                saveDB();
+                updateHeaderUserInfo();
+                closeEditSubjectModal();
+                showToast("Materia actualizada");
+            }
+        }
+
+        if (document.readyState === 'interactive' || document.readyState === 'complete') {
+            initApp();
+        } else {
+            document.addEventListener('DOMContentLoaded', initApp);
+        }
+        window.onload = initApp;
+
+        function renderGradeTabs() {
+            const container = document.getElementById('gradeTabs');
+            if (!container) return;
+            container.innerHTML = '';
+
+            GRADES.forEach(grade => {
+                const isActive = grade === currentGrade;
+                const btn = document.createElement('button');
+                btn.className = `py-2 px-1 rounded-xl font-bold text-xs transition duration-150 flex flex-col sm:flex-row items-center justify-center space-x-0 sm:space-x-1 ${
+                    isActive 
+                    ? 'bg-purple-600 text-white shadow-xs' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`;
+                btn.innerHTML = `<i class="fa-solid fa-graduation-cap text-xs"></i><span>${grade}</span>`;
+                btn.onclick = () => {
+                    currentGrade = grade;
+                    renderGradeTabs();
+                    renderSectionTabs();
+                    renderStudentList();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function renderSectionTabs() {
+            const container = document.getElementById('sectionTabs');
+            if (!container) return;
+            container.innerHTML = '';
+
+            SECTIONS.forEach(sec => {
+                const isActive = sec === currentSection;
+                const count = db.students.filter(s => s.grade === currentGrade && s.section === sec).length;
+
+                const btn = document.createElement('button');
+                btn.className = `px-3 py-1.5 rounded-xl text-xs font-bold transition duration-150 flex items-center space-x-1.5 ${
+                    isActive 
+                    ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-2xs' 
+                    : 'text-slate-500 hover:bg-slate-100'
+                }`;
+                btn.innerHTML = `<span>Sección ${sec}</span><span class="px-1.5 py-0.2 rounded-md text-[10px] ${isActive ? 'bg-white/30 text-white' : 'bg-slate-200 text-slate-600'}">${count}</span>`;
+                btn.onclick = () => {
+                    currentSection = sec;
+                    renderSectionTabs();
+                    renderStudentList();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function loadAttendanceForDate() {
+            const inputVal = document.getElementById('attendanceDate').value;
+            if (inputVal) {
+                currentDate = inputVal;
+                renderStudentList();
+            }
+        }
+
+        function renderStudentList() {
+            const container = document.getElementById('studentContainer');
+            const emptyState = document.getElementById('emptyState');
+            if (!container || !emptyState) return;
+
+            const searchInput = document.getElementById('searchInput');
+            const search = searchInput ? searchInput.value.toLowerCase().trim() : '';
+
+            const filtered = db.students.filter(s => 
+                s.grade === currentGrade && 
+                s.section === currentSection && 
+                s.name.toLowerCase().includes(search)
+            );
+
+            if (!db.attendance[currentDate]) {
+                db.attendance[currentDate] = {};
+            }
+
+            const currentDayRecord = db.attendance[currentDate];
+
+            if (filtered.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                updateStatistics(0, 0, 0, 0);
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            container.innerHTML = '';
+
+            let pCount = 0, aCount = 0, jCount = 0;
+
+            filtered.forEach(student => {
+                const status = currentDayRecord[student.id] || 'none';
+                if (status === 'present') pCount++;
+                else if (status === 'absent') aCount++;
+                else if (status === 'justified') jCount++;
+
+                const card = document.createElement('div');
+                
+                let statusBorder = "border-l-4 border-l-slate-300";
+                if (status === 'present') statusBorder = "border-l-4 border-l-emerald-500 bg-emerald-50/20";
+                else if (status === 'absent') statusBorder = "border-l-4 border-l-rose-500 bg-rose-50/20";
+                else if (status === 'justified') statusBorder = "border-l-4 border-l-amber-500 bg-amber-50/20";
+
+                card.className = `relative overflow-hidden bg-white p-3.5 rounded-2xl border border-slate-200 shadow-2xs hover:shadow-xs transition duration-150 space-y-2.5 select-none touch-pan-y cursor-grab active:cursor-grabbing ${statusBorder}`;
+
+                card.innerHTML = `
+                    <div class="swipe-indicator-right absolute inset-y-0 left-0 w-28 bg-gradient-to-r from-emerald-500 to-transparent text-white flex items-center pl-3 font-extrabold text-xs opacity-0 pointer-events-none transition-opacity duration-150 z-10 rounded-l-2xl">
+                        <i class="fa-solid fa-circle-check text-sm mr-1"></i> PRESENTE
+                    </div>
+                    <div class="swipe-indicator-left absolute inset-y-0 right-0 w-28 bg-gradient-to-l from-rose-500 to-transparent text-white flex items-center justify-end pr-3 font-extrabold text-xs opacity-0 pointer-events-none transition-opacity duration-150 z-10 rounded-r-2xl">
+                        AUSENTE <i class="fa-solid fa-circle-xmark text-sm ml-1"></i>
+                    </div>
+
+                    <div class="card-inner space-y-2.5 relative z-20">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <div class="flex items-center space-x-2.5">
+                                <div class="w-8 h-8 rounded-full bg-purple-100 text-purple-700 font-bold text-xs flex items-center justify-center">
+                                    ${student.name.charAt(0).toUpperCase()}
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-slate-800 text-xs leading-tight">${student.name}</h4>
+                                    <span class="text-[10px] text-slate-400 font-medium">Nº ${student.code || '--'}</span>
+                                </div>
+                            </div>
+                            <button onclick="deleteStudent('${student.id}')" title="Eliminar Estudiante" class="text-slate-300 hover:text-rose-500 transition text-xs p-1.5 rounded-lg hover:bg-rose-50">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-1 pt-0.5">
+                            <button onclick="setStudentStatus('${student.id}', 'present')" class="py-1.5 px-1 rounded-xl font-bold text-[11px] flex items-center justify-center space-x-1 transition ${
+                                status === 'present' 
+                                ? 'bg-emerald-500 text-white shadow-2xs' 
+                                : 'bg-emerald-100/70 text-emerald-800 hover:bg-emerald-200'
+                            }">
+                                <i class="fa-solid fa-circle-check text-[10px]"></i>
+                                <span>Presente</span>
+                            </button>
+
+                            <button onclick="setStudentStatus('${student.id}', 'absent')" class="py-1.5 px-1 rounded-xl font-bold text-[11px] flex items-center justify-center space-x-1 transition ${
+                                status === 'absent' 
+                                ? 'bg-rose-500 text-white shadow-2xs' 
+                                : 'bg-rose-100/70 text-rose-800 hover:bg-rose-200'
+                            }">
+                                <i class="fa-solid fa-circle-xmark text-[10px]"></i>
+                                <span>Ausente</span>
+                            </button>
+
+                            <button onclick="setStudentStatus('${student.id}', 'justified')" class="py-1.5 px-1 rounded-xl font-bold text-[11px] flex items-center justify-center space-x-1 transition ${
+                                status === 'justified' 
+                                ? 'bg-amber-500 text-white shadow-2xs' 
+                                : 'bg-amber-100/70 text-amber-800 hover:bg-amber-200'
+                            }">
+                                <i class="fa-solid fa-clock-rotate-left text-[10px]"></i>
+                                <span>Justificado</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+
+                container.appendChild(card);
+                attachSwipeHandlers(card, student.id);
+            });
+
+            updateStatistics(pCount, aCount, jCount, filtered.length);
+        }
+
+        function attachSwipeHandlers(cardEl, studentId) {
+            let startX = 0;
+            let currentX = 0;
+            let startY = 0;
+            let isDragging = false;
+            let isHorizontalSwipe = null;
+            const threshold = 60;
+
+            const badgeRight = cardEl.querySelector('.swipe-indicator-right');
+            const badgeLeft = cardEl.querySelector('.swipe-indicator-left');
+            const inner = cardEl.querySelector('.card-inner');
+
+            function handleStart(x, y) {
+                startX = x;
+                currentX = x;
+                startY = y;
+                isDragging = true;
+                isHorizontalSwipe = null;
+                inner.style.transition = 'none';
+            }
+
+            function handleMove(x, y) {
+                if (!isDragging) return;
+                const diffX = x - startX;
+                const diffY = y - startY;
+
+                if (isHorizontalSwipe === null) {
+                    if (Math.abs(diffX) > 6 || Math.abs(diffY) > 6) {
+                        isHorizontalSwipe = Math.abs(diffX) > Math.abs(diffY);
+                    }
+                }
+
+                if (!isHorizontalSwipe) return;
+
+                currentX = x;
+                const moveAmount = diffX * 0.75;
+                inner.style.transform = `translateX(${moveAmount}px) rotate(${moveAmount * 0.02}deg)`;
+
+                if (diffX > 15) {
+                    badgeRight.style.opacity = Math.min(1, (diffX - 15) / 45);
+                    badgeLeft.style.opacity = '0';
+                } else if (diffX < -15) {
+                    badgeLeft.style.opacity = Math.min(1, (-diffX - 15) / 45);
+                    badgeRight.style.opacity = '0';
+                } else {
+                    badgeRight.style.opacity = '0';
+                    badgeLeft.style.opacity = '0';
+                }
+            }
+
+            function handleEnd() {
+                if (!isDragging) return;
+                isDragging = false;
+                const diffX = currentX - startX;
+
+                inner.style.transition = 'transform 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                badgeRight.style.opacity = '0';
+                badgeLeft.style.opacity = '0';
+
+                if (isHorizontalSwipe && Math.abs(diffX) >= threshold) {
+                    if (diffX > 0) {
+                        inner.style.transform = 'translateX(35px)';
+                        setTimeout(() => {
+                            inner.style.transform = 'translateX(0px) rotate(0deg)';
+                            setStudentStatus(studentId, 'present');
+                            showToast("Marcado como Presente 👉");
+                        }, 100);
+                    } else {
+                        inner.style.transform = 'translateX(-35px)';
+                        setTimeout(() => {
+                            inner.style.transform = 'translateX(0px) rotate(0deg)';
+                            setStudentStatus(studentId, 'absent');
+                            showToast("Marcado como Ausente 👈");
+                        }, 100);
+                    }
+                } else {
+                    inner.style.transform = 'translateX(0px) rotate(0deg)';
+                }
+                isHorizontalSwipe = null;
+            }
+
+            cardEl.addEventListener('touchstart', (e) => {
+                const touch = e.touches[0];
+                handleStart(touch.clientX, touch.clientY);
+            }, { passive: true });
+
+            cardEl.addEventListener('touchmove', (e) => {
+                if (!isDragging) return;
+                const touch = e.touches[0];
+                handleMove(touch.clientX, touch.clientY);
+            }, { passive: true });
+
+            cardEl.addEventListener('touchend', handleEnd, { passive: true });
+            cardEl.addEventListener('touchcancel', handleEnd, { passive: true });
+
+            cardEl.addEventListener('mousedown', (e) => {
+                if (e.target.closest('button')) return;
+                handleStart(e.clientX, e.clientY);
+
+                const onMouseMove = (me) => handleMove(me.clientX, me.clientY);
+                const onMouseUp = () => {
+                    handleEnd();
+                    window.removeEventListener('mousemove', onMouseMove);
+                    window.removeEventListener('mouseup', onMouseUp);
+                };
+
+                window.addEventListener('mousemove', onMouseMove);
+                window.addEventListener('mouseup', onMouseUp);
+            });
+        }
+
+        function updateStatistics(p, a, j, total) {
+            document.getElementById('statPresent').innerText = p;
+            document.getElementById('statAbsent').innerText = a;
+            document.getElementById('statJustified').innerText = j;
+            document.getElementById('statTotal').innerText = total;
+        }
+
+        function setStudentStatus(studentId, status) {
+            if (!db.attendance[currentDate]) {
+                db.attendance[currentDate] = {};
+            }
+
+            if (db.attendance[currentDate][studentId] === status) {
+                delete db.attendance[currentDate][studentId];
+            } else {
+                db.attendance[currentDate][studentId] = status;
+            }
+
+            saveDB();
+            syncAttendanceToCloud(currentDate);
+            renderStudentList();
+        }
+
+        function setAllStatus(status) {
+            const sectionStudents = db.students.filter(s => s.grade === currentGrade && s.section === currentSection);
+            if (!db.attendance[currentDate]) db.attendance[currentDate] = {};
+
+            sectionStudents.forEach(st => {
+                if (status === 'none') {
+                    delete db.attendance[currentDate][st.id];
+                } else {
+                    db.attendance[currentDate][st.id] = status;
+                }
+            });
+
+            saveDB();
+            syncAttendanceToCloud(currentDate);
+            renderStudentList();
+        }
+
+        function deleteStudent(id) {
+            const student = db.students.find(s => s.id === id);
+            if (!student) return;
+
+            studentToDeleteId = id;
+            document.getElementById('deleteConfirmText').innerText = `¿Estás seguro de que deseas eliminar a "${student.name}"?`;
+            document.getElementById('deleteConfirmModal').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            studentToDeleteId = null;
+            document.getElementById('deleteConfirmModal').classList.add('hidden');
+        }
+
+        async function confirmDeleteStudent() {
+            if (!studentToDeleteId) return;
+
+            const idToDelete = studentToDeleteId;
+            db.students = db.students.filter(s => s.id !== idToDelete);
+
+            Object.keys(db.attendance).forEach(date => {
+                if (db.attendance[date] && db.attendance[date][idToDelete]) {
+                    delete db.attendance[date][idToDelete];
+                }
+            });
+
+            saveDB();
+
+            if (window.isFirestoreReady && window.firestoreDb && window.firebaseModule) {
+                try {
+                    const { doc, deleteDoc } = window.firebaseModule;
+                    const ref = doc(window.firestoreDb, 'artifacts', appId, 'public', 'data', 'students', idToDelete);
+                    await deleteDoc(ref);
+                } catch(e) {
+                    console.warn("Error al borrar estudiante de la nube:", e);
+                }
+            }
+
+            closeDeleteModal();
+            renderSectionTabs();
+            renderStudentList();
+            showToast("Estudiante eliminado correctamente");
+        }
+
+        function openImportModal() {
+            document.getElementById('modalSectionBadge').innerText = `${currentGrade} - Sección ${currentSection}`;
+            document.getElementById('importModal').classList.remove('hidden');
+        }
+
+        function closeImportModal() {
+            document.getElementById('importModal').classList.add('hidden');
+            document.getElementById('manualStudentName').value = '';
+            document.getElementById('manualStudentCode').value = '';
+            document.getElementById('batchText').value = '';
+        }
+
+        function switchModalTab(tab) {
+            const manualBtn = document.getElementById('tabManualBtn');
+            const batchBtn = document.getElementById('tabBatchBtn');
+            const formManual = document.getElementById('formManual');
+            const formBatch = document.getElementById('formBatch');
+
+            if (tab === 'manual') {
+                manualBtn.className = "px-3 py-1.5 border-b-2 border-purple-600 text-purple-600";
+                batchBtn.className = "px-3 py-1.5 border-b-2 border-transparent text-slate-400 hover:text-slate-600";
+                formManual.classList.remove('hidden');
+                formBatch.classList.add('hidden');
+            } else {
+                batchBtn.className = "px-3 py-1.5 border-b-2 border-purple-600 text-purple-600";
+                manualBtn.className = "px-3 py-1.5 border-b-2 border-transparent text-slate-400 hover:text-slate-600";
+                formBatch.classList.remove('hidden');
+                formManual.classList.add('hidden');
+            }
+        }
+
+        function saveSingleStudent(e) {
+            e.preventDefault();
+            const name = document.getElementById('manualStudentName').value.trim();
+            const code = document.getElementById('manualStudentCode').value.trim();
+
+            if (!name) return;
+
+            const newStudent = {
+                id: 'std_' + Date.now() + '_' + Math.floor(Math.random()*1000),
+                name: name,
+                code: code || String(db.students.length + 1).padStart(2, '0'),
+                grade: currentGrade,
+                section: currentSection
+            };
+
+            db.students.push(newStudent);
+            saveDB();
+            syncStudentToCloud(newStudent);
+
+            closeImportModal();
+            renderSectionTabs();
+            renderStudentList();
+            showToast("Estudiante guardado exitosamente");
+        }
+
+        function saveBatchStudents() {
+            const text = document.getElementById('batchText').value.trim();
+            if (!text) return;
+
+            const lines = text.split('\n');
+            let addedCount = 0;
+
+            lines.forEach((line, idx) => {
+                const cleaned = line.trim();
+                if (cleaned) {
+                    const newStudent = {
+                        id: 'std_' + Date.now() + '_' + idx,
+                        name: cleaned,
+                        code: String(db.students.length + 1).padStart(2, '0'),
+                        grade: currentGrade,
+                        section: currentSection
+                    };
+                    db.students.push(newStudent);
+                    syncStudentToCloud(newStudent);
+                    addedCount++;
+                }
+            });
+
+            if (addedCount > 0) {
+                saveDB();
+                closeImportModal();
+                renderSectionTabs();
+                renderStudentList();
+                showToast(`Se agregaron ${addedCount} estudiantes`);
+            }
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
+
+                let added = 0;
+                rows.forEach((row, i) => {
+                    if (row && row[0]) {
+                        const name = String(row[0]).trim();
+                        if (name && name.toLowerCase() !== 'nombre' && name.toLowerCase() !== 'estudiante') {
+                            const newStudent = {
+                                id: 'std_xl_' + Date.now() + '_' + i,
+                                name: name,
+                                code: row[1] ? String(row[1]).trim() : String(db.students.length + 1).padStart(2, '0'),
+                                grade: currentGrade,
+                                section: currentSection
+                            };
+                            db.students.push(newStudent);
+                            syncStudentToCloud(newStudent);
+                            added++;
+                        }
+                    }
+                });
+
+                if (added > 0) {
+                    saveDB();
+                    closeImportModal();
+                    renderSectionTabs();
+                    renderStudentList();
+                    showToast(`Se cargaron ${added} estudiantes desde el archivo`);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function generateMonthlyReport() {
+            const subj = db.currentUser ? db.currentUser.subject : 'General';
+            document.getElementById('reportSubtitle').innerText = `${currentGrade} - Sección ${currentSection} | Materia: ${subj}`;
+            document.getElementById('reportModal').classList.remove('hidden');
+            renderReportTable();
+        }
+
+        function closeReportModal() {
+            document.getElementById('reportModal').classList.add('hidden');
+        }
+
+        function renderReportTable() {
+            const monthVal = document.getElementById('reportMonthPicker').value;
+            if (!monthVal) return;
+
+            const [yearStr, monthStr] = monthVal.split('-');
+            const year = parseInt(yearStr);
+            const month = parseInt(monthStr);
+
+            const daysInMonth = new Date(year, month, 0).getDate();
+            const students = db.students.filter(s => s.grade === currentGrade && s.section === currentSection);
+            
+            const table = document.getElementById('reportTable');
+            if (!table) return;
+            table.innerHTML = '';
+
+            const subj = db.currentUser ? db.currentUser.subject : 'Asignatura';
+            document.getElementById('printHeaderSubject').innerText = `Materia: ${subj} | Docente: ${db.currentUser ? db.currentUser.name : ''}`;
+            document.getElementById('printHeaderSubtitle').innerText = `${currentGrade} Sección "${currentSection}" - Mes: ${monthStr}/${year}`;
+
+            let theadHtml = `<thead class="bg-purple-100 text-purple-900 font-bold border-b border-purple-200"><tr>`;
+            theadHtml += `<th class="p-1.5 border-r border-purple-200 text-center w-7">#</th>`;
+            theadHtml += `<th class="p-1.5 border-r border-purple-200 min-w-[150px]">Estudiante</th>`;
+            
+            for (let d = 1; d <= daysInMonth; d++) {
+                theadHtml += `<th class="p-1 border-r border-purple-200 text-center w-6 text-[10px]">${d}</th>`;
+            }
+            theadHtml += `<th class="p-1 border-r border-purple-200 text-center bg-emerald-100 text-emerald-900 w-7" title="Presentes">P</th>`;
+            theadHtml += `<th class="p-1 border-r border-purple-200 text-center bg-rose-100 text-rose-900 w-7" title="Ausentes">A</th>`;
+            theadHtml += `<th class="p-1 border-r border-purple-200 text-center bg-amber-100 text-amber-900 w-7" title="Justificados">J</th>`;
+            theadHtml += `<th class="p-1 text-center bg-sky-100 text-sky-900 w-10" title="% Asistencia">%</th>`;
+            theadHtml += `</tr></thead>`;
+
+            let tbodyHtml = `<tbody class="divide-y divide-slate-100 bg-white">`;
+
+            if (students.length === 0) {
+                tbodyHtml += `<tr><td colspan="${daysInMonth + 6}" class="p-6 text-center text-slate-400">No hay estudiantes en esta sección.</td></tr>`;
+            } else {
+                students.forEach((st, idx) => {
+                    let pTotal = 0, aTotal = 0, jTotal = 0;
+
+                    tbodyHtml += `<tr class="hover:bg-slate-50 transition">`;
+                    tbodyHtml += `<td class="p-1.5 border-r border-slate-100 text-center text-slate-400 font-medium text-[10px]">${idx + 1}</td>`;
+                    tbodyHtml += `<td class="p-1.5 border-r border-slate-100 font-semibold text-slate-700 truncate max-w-[170px]">${st.name}</td>`;
+
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        const dayFormatted = String(d).padStart(2, '0');
+                        const dateKey = `${yearStr}-${monthStr}-${dayFormatted}`;
+                        const status = db.attendance[dateKey] ? db.attendance[dateKey][st.id] : null;
+
+                        let cellBg = '';
+                        let cellContent = '-';
+
+                        if (status === 'present') {
+                            cellBg = 'bg-emerald-100 text-emerald-800 font-bold';
+                            cellContent = 'P';
+                            pTotal++;
+                        } else if (status === 'absent') {
+                            cellBg = 'bg-rose-100 text-rose-800 font-bold';
+                            cellContent = 'A';
+                            aTotal++;
+                        } else if (status === 'justified') {
+                            cellBg = 'bg-amber-100 text-amber-800 font-bold';
+                            cellContent = 'J';
+                            jTotal++;
+                        } else {
+                            cellBg = 'text-slate-300';
+                        }
+
+                        tbodyHtml += `<td class="p-1 border-r border-slate-100 text-center text-[10px] ${cellBg}">${cellContent}</td>`;
+                    }
+
+                    const recordedTotal = pTotal + aTotal + jTotal;
+                    const pct = recordedTotal > 0 ? Math.round((pTotal / recordedTotal) * 100) : 0;
+
+                    tbodyHtml += `<td class="p-1 border-r border-slate-100 text-center font-bold bg-emerald-50 text-emerald-700">${pTotal}</td>`;
+                    tbodyHtml += `<td class="p-1 border-r border-slate-100 text-center font-bold bg-rose-50 text-rose-700">${aTotal}</td>`;
+                    tbodyHtml += `<td class="p-1 border-r border-slate-100 text-center font-bold bg-amber-50 text-amber-700">${jTotal}</td>`;
+                    tbodyHtml += `<td class="p-1 text-center font-extrabold bg-sky-50 text-sky-800">${pct}%</td>`;
+                    tbodyHtml += `</tr>`;
+                });
+            }
+
+            tbodyHtml += `</tbody>`;
+            table.innerHTML = theadHtml + tbodyHtml;
+        }
+
+        function openInstallModal() {
+            document.getElementById('installModal').classList.remove('hidden');
+        }
+
+        function closeInstallModal() {
+            document.getElementById('installModal').classList.add('hidden');
+        }
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            if (!toast || !toastMessage || !toastIcon) return;
+
+            toastMessage.innerText = message;
+            if (type === 'error') {
+                toastIcon.className = 'fa-solid fa-circle-exclamation text-rose-400 text-base';
+            } else {
+                toastIcon.className = 'fa-solid fa-circle-check text-emerald-400 text-base';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        function printReport() {
+            window.print();
+        }
+
+        function exportToExcel() {
+            try {
+                const table = document.getElementById('reportTable');
+                const monthVal = document.getElementById('reportMonthPicker').value;
+                const wb = XLSX.utils.table_to_book(table, {sheet: "Asistencia"});
+                XLSX.writeFile(wb, `Asistencia_${currentGrade.replace(' ','')}_Sec_${currentSection}_${monthVal}.xlsx`);
+                showToast("¡Reporte Excel descargado!");
+            } catch(err) {
+                console.error(err);
+                showToast("Error al exportar a Excel", "error");
+            }
+        }
+
+        function exportToPDF() {
+            try {
+                const monthVal = document.getElementById('reportMonthPicker').value;
+                if (!monthVal) return;
+
+                const [yearStr, monthStr] = monthVal.split('-');
+                const year = parseInt(yearStr);
+                const month = parseInt(monthStr);
+                const daysInMonth = new Date(year, month, 0).getDate();
+
+                const students = db.students.filter(s => s.grade === currentGrade && s.section === currentSection);
+                if (students.length === 0) {
+                    showToast("No hay estudiantes para exportar.", "error");
+                    return;
+                }
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF({
+                    orientation: 'landscape',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+
+                const subjectText = db.currentUser ? db.currentUser.subject : '';
+                const teacherText = db.currentUser ? db.currentUser.name : '';
+
+                doc.setFont("helvetica", "bold");
+                doc.setFontSize(14);
+                doc.setTextColor(109, 40, 217);
+                doc.text(`U.E. MARÍA VIRGEN MISIONERA`, 14, 13);
+
+                doc.setFontSize(10);
+                doc.setFont("helvetica", "bold");
+                doc.setTextColor(51, 65, 85);
+                doc.text(`Reporte de Asistencia • Materia: ${subjectText} (${teacherText})`, 14, 18);
+
+                doc.setFont("helvetica", "normal");
+                doc.setFontSize(9);
+                doc.setTextColor(100, 116, 139);
+                doc.text(`Año: ${currentGrade} - Sección: "${currentSection}" | Mes/Año: ${monthStr}/${year}`, 14, 23);
+
+                const headers = ['#', 'Estudiante'];
+                for (let d = 1; d <= daysInMonth; d++) {
+                    headers.push(String(d));
+                }
+                headers.push('P', 'A', 'J', '%');
+
+                const rows = [];
+                students.forEach((st, idx) => {
+                    let pTotal = 0, aTotal = 0, jTotal = 0;
+                    const row = [(idx + 1).toString(), st.name];
+
+                    for (let d = 1; d <= daysInMonth; d++) {
+                        const dayFormatted = String(d).padStart(2, '0');
+                        const dateKey = `${yearStr}-${monthStr}-${dayFormatted}`;
+                        const status = db.attendance[dateKey] ? db.attendance[dateKey][st.id] : null;
+
+                        if (status === 'present') {
+                            row.push('P');
+                            pTotal++;
+                        } else if (status === 'absent') {
+                            row.push('A');
+                            aTotal++;
+                        } else if (status === 'justified') {
+                            row.push('J');
+                            jTotal++;
+                        } else {
+                            row.push('-');
+                        }
+                    }
+
+                    const recordedTotal = pTotal + aTotal + jTotal;
+                    const pct = recordedTotal > 0 ? Math.round((pTotal / recordedTotal) * 100) + '%' : '0%';
+
+                    row.push(pTotal, aTotal, jTotal, pct);
+                    rows.push(row);
+                });
+
+                doc.autoTable({
+                    head: [headers],
+                    body: rows,
+                    startY: 27,
+                    styles: { fontSize: 6.5, cellPadding: 1, halign: 'center' },
+                    columnStyles: {
+                        0: { cellWidth: 7 },
+                        1: { cellWidth: 32, halign: 'left' }
+                    },
+                    headStyles: { fillColor: [237, 233, 254], textColor: [109, 40, 217], fontStyle: 'bold' },
+                    didParseCell: function(data) {
+                        if (data.section === 'body' && data.column.index >= 2 && data.column.index < 2 + daysInMonth) {
+                            const val = data.cell.raw;
+                            if (val === 'P') {
+                                data.cell.styles.fillColor = [209, 250, 229];
+                                data.cell.styles.textColor = [6, 95, 70];
+                                data.cell.styles.fontStyle = 'bold';
+                            } else if (val === 'A') {
+                                data.cell.styles.fillColor = [254, 226, 226];
+                                data.cell.styles.textColor = [153, 27, 27];
+                                data.cell.styles.fontStyle = 'bold';
+                            } else if (val === 'J') {
+                                data.cell.styles.fillColor = [254, 243, 199];
+                                data.cell.styles.textColor = [146, 64, 14];
+                                data.cell.styles.fontStyle = 'bold';
+                            }
+                        }
+                    }
+                });
+
+                doc.save(`Asistencia_UE_MariaVirgenMisionera_${currentGrade.replace(' ','')}_Sec_${currentSection}_${monthVal}.pdf`);
+                showToast("¡Reporte PDF descargado!");
+            } catch(err) {
+                console.error(err);
+                showToast("Error al exportar a PDF.", "error");
+            }
+        }
+    </script>
+</body>
+</html>
